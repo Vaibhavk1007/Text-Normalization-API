@@ -1,28 +1,74 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from typing import Optional
+from PIL import Image
+import io
 
-# import your pipeline function
-from normalizer import text_normalizer_pipeline  # adjust filename if needed
+from normalizer import text_normalizer_pipeline
+from ocr_engine import ocr_image, ocr_pdf
 
-app = FastAPI(title="Text Normalizer API")
+app = FastAPI(title="Document Text Repair API")
 
-# ✅ VERY IMPORTANT (CORS)
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # later restrict to formyxa.com
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class NormalizeRequest(BaseModel):
-    text: str
+@app.post("/normalize")
+async def normalize(
+    text: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
+):
+    # ❌ invalid input
+    if not text and not file:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either text or an image/PDF file"
+        )
 
-class NormalizeResponse(BaseModel):
-    normalized_text: str
+    if text and file:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide only one input: text OR file"
+        )
 
-@app.post("/normalize", response_model=NormalizeResponse)
-def normalize_text(payload: NormalizeRequest):
-    result = text_normalizer_pipeline(payload.text)
-    return {"normalized_text": result}
+    try:
+        # TEXT FLOW
+        if text:
+            raw_text = text
+            input_type = "text"
+
+        # FILE FLOW
+        else:
+            filename = file.filename.lower()
+            content = await file.read()
+            input_type = "file"
+
+            if filename.endswith((".png", ".jpg", ".jpeg")):
+                image = Image.open(io.BytesIO(content)).convert("RGB")
+                raw_text = ocr_image(image)
+
+            elif filename.endswith(".pdf"):
+                raw_text = ocr_pdf(content)
+
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unsupported file type"
+                )
+
+        # 🔥 SAME CLEANUP PIPELINE
+        normalized_text = text_normalizer_pipeline(raw_text)
+
+        return {
+            "input_type": input_type,
+            "raw_text": raw_text,
+            "normalized_text": normalized_text
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
