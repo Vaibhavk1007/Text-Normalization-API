@@ -2,9 +2,12 @@ fastapi
 uvicorn
 pydantic
 python-multipart
-
 pillow
-pypdfium2
+numpy
 
+# OCR (TEXT ONLY)
+paddleocr==2.7.3
 paddlepaddle==2.6.2
-paddleocr==2.7.0.3
+
+# PDF → image (wheel-based, NO native build)
+pypdfium2==4.30.0
