@@ -1,12 +1,7 @@
 from paddleocr import PaddleOCR
 from PIL import Image
 import pypdfium2 as pdfium
-import numpy as np
 import io
-
-# ===============================
-# Lazy OCR initialization
-# ===============================
 
 _ocr = None
 
@@ -16,53 +11,32 @@ def get_ocr():
         _ocr = PaddleOCR(
             use_angle_cls=False,
             lang="en",
-            use_gpu=False,
-            enable_mkldnn=False
+            use_gpu=False
         )
     return _ocr
 
 
-# ===============================
-# OCR IMAGE
-# ===============================
-
 def ocr_image(image: Image.Image) -> str:
-    """
-    Extract RAW text from a PIL image.
-    NO cleanup, NO normalization.
-    """
     ocr = get_ocr()
-
-    # PaddleOCR accepts numpy arrays
-    img_array = np.array(image)
-
-    result = ocr.ocr(img_array, cls=False)
+    result = ocr.ocr(image, cls=False)
 
     lines = []
-    for page in result:
-        for block in page:
-            lines.append(block[1][0])  # text only
+    for block in result:
+        for line in block:
+            lines.append(line[1][0])
 
     return "\n".join(lines)
 
 
-# ===============================
-# OCR PDF
-# ===============================
-
 def ocr_pdf(pdf_bytes: bytes) -> str:
-    """
-    Convert PDF → images → OCR → raw text
-    """
     pdf = pdfium.PdfDocument(pdf_bytes)
-    pages_text = []
+    text_pages = []
 
     for page in pdf:
-        bitmap = page.render_to(
-            scale=2.0,   # good quality
-            rotation=0
+        pil_image = page.render_to(
+            pdfium.BitmapConv.pil_image,
+            scale=2
         )
-        image = Image.fromarray(bitmap.to_numpy())
-        pages_text.append(ocr_image(image))
+        text_pages.append(ocr_image(pil_image))
 
-    return "\n\n".join(pages_text)
+    return "\n\n".join(text_pages)
