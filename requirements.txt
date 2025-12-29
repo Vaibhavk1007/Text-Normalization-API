@@ -2,6 +2,9 @@ fastapi
 uvicorn
 pydantic
 python-multipart
+
 pillow
-paddleocr
 pymupdf
+
+paddlepaddle==2.6.2
+paddleocr
