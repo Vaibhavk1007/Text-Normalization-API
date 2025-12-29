@@ -4,7 +4,12 @@ import fitz  # PyMuPDF
 import io
 
 # Initialize once (important for performance)
-ocr = PaddleOCR(use_angle_cls=True, lang="en")
+ocr = PaddleOCR(
+    use_angle_cls=False,
+    lang="en",
+    use_gpu=False,
+    enable_mkldnn=False
+)
 
 def ocr_image(image: Image.Image) -> str:
     """
