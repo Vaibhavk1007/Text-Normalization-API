@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from PIL import Image
 import io
+import traceback   # ✅ ADD
 
 from normalizer import text_normalizer_pipeline
 from ocr_engine import ocr_image, ocr_pdf
@@ -37,19 +38,29 @@ async def normalize(
         )
 
     try:
+        # =====================
         # TEXT FLOW
+        # =====================
         if text:
             raw_text = text
             input_type = "text"
 
+        # =====================
         # FILE FLOW
+        # =====================
         else:
             filename = file.filename.lower()
             content = await file.read()
             input_type = "file"
 
             if filename.endswith((".png", ".jpg", ".jpeg")):
-                image = Image.open(io.BytesIO(content)).convert("RGB")
+                # ✅ SAFE IMAGE LOAD (CRITICAL)
+                image = Image.open(io.BytesIO(content))
+                image.load()                 # force decode
+                image = image.convert("RGB")
+
+                print("OCR IMAGE:", image.size, image.mode)  # ✅ TEMP LOG
+
                 raw_text = ocr_image(image)
 
             elif filename.endswith(".pdf"):
@@ -61,7 +72,9 @@ async def normalize(
                     detail="Unsupported file type"
                 )
 
-        # 🔥 SAME CLEANUP PIPELINE
+        # =====================
+        # NORMALIZATION
+        # =====================
         normalized_text = text_normalizer_pipeline(raw_text)
 
         return {
@@ -71,4 +84,9 @@ async def normalize(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # ✅ DO NOT SWALLOW ERRORS
+        traceback.print_exc()  # shows full stack trace in Render logs
+        raise HTTPException(
+            status_code=500,
+            detail=repr(e)     # repr > str (never empty)
+        )
