@@ -3,7 +3,7 @@ uvicorn
 pydantic
 python-multipart
 pillow
-numpy
+numpy==1.26.4
 
 # OCR (TEXT ONLY)
 paddleocr==2.7.3
